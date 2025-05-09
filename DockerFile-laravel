@@ -1,0 +1,52 @@
+FROM php:8.2-apache
+
+# Apache modüllerini etkinleştir
+RUN a2enmod rewrite
+
+# Gerekli paketleri yükle
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libzip-dev \
+    sqlite3 \
+    libsqlite3-dev
+
+# PHP eklentilerini kur
+RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
+
+# SQLite için PDO eklentisini kur
+RUN docker-php-ext-install pdo_sqlite
+
+# Composer kur
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Çalışma dizinini ayarla
+WORKDIR /var/www/html
+
+# Laravel uygulamasını kopyala
+COPY ./login-prediction-app .
+
+# Composer bağımlılıklarını kur
+RUN composer install --no-interaction --no-dev --optimize-autoloader
+
+# Storage klasörü için gerekli izinleri ayarla
+RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
+# Apache DocumentRoot'u Laravel public klasörü olarak ayarla
+ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# .env dosyasını oluştur (gerçek bir deployment'ta environment variables kullanılacak)
+RUN cp .env.example .env
+RUN php artisan key:generate
+
+EXPOSE 80
+
+CMD ["apache2-foreground"]

@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+  laravel:
+    build:
+      context: .
+      dockerfile: Dockerfile-laravel
+    container_name: humanas-laravel
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./login-prediction-app/storage:/var/www/html/storage
+    environment:
+      APP_URL: http://localhost:8000
+      APP_ENV: local
+      APP_DEBUG: "true"
+      # SQLite veritabanı kullanıldığı için veritabanı bağlantı bilgileri gerekmez
+    networks:
+      - humanas-network
+
+  react:
+    build:
+      context: .
+      dockerfile: Dockerfile-react
+    container_name: humanas-react
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - laravel
+    environment:
+      REACT_APP_API_BASE_URL: http://localhost:8000/api
+    networks:
+      - humanas-network
+
+networks:
+  humanas-network:
+    driver: bridge
